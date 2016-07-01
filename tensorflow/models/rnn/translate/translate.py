@@ -41,6 +41,9 @@ import numpy as np
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
+import pyDaemon
+#pyDaemon.createDaemon()
+
 from tensorflow.models.rnn.translate import data_utils
 from tensorflow.models.rnn.translate import seq2seq_model
 
@@ -132,18 +135,24 @@ def create_model(session, forward_only):
 def train():
   """Train a en->fr translation model using WMT data."""
   # Prepare WMT data.
-  print("Preparing WMT data in %s" % FLAGS.data_dir)
+  f_output = open('/Users/zacksnyder/ProgramOut.txt', 'w')
+  f_output.write("Preparing WMT data in %s\n" % FLAGS.data_dir)
+  f_output.close()
   en_train, fr_train, en_dev, fr_dev, _, _ = data_utils.prepare_wmt_data(
       FLAGS.data_dir, FLAGS.en_vocab_size, FLAGS.fr_vocab_size)
 
   with tf.Session() as sess:
     # Create model.
-    print("Creating %d layers of %d units." % (FLAGS.num_layers, FLAGS.size))
+    f_output = open('/Users/zacksnyder/ProgramOut.txt', 'a')
+    f_output.write("Creating %d layers of %d units.\n" % (FLAGS.num_layers, FLAGS.size))
+    f_output.close()
     model = create_model(sess, False)
 
     # Read data into buckets and compute their sizes.
-    print ("Reading development and training data (limit: %d)."
+    f_output = open('/Users/zacksnyder/ProgramOut.txt', 'a')
+    f_output.write("Reading development and training data (limit: %d).\n"
            % FLAGS.max_train_data_size)
+    f_output.close()
     dev_set = read_data(en_dev, fr_dev)
     train_set = read_data(en_train, fr_train, FLAGS.max_train_data_size)
     train_bucket_sizes = [len(train_set[b]) for b in xrange(len(_buckets))]
@@ -180,9 +189,11 @@ def train():
       if current_step % FLAGS.steps_per_checkpoint == 0:
         # Print statistics for the previous epoch.
         perplexity = math.exp(loss) if loss < 300 else float('inf')
-        print ("global step %d learning rate %.4f step-time %.2f perplexity "
-               "%.2f" % (model.global_step.eval(), model.learning_rate.eval(),
+        f_output = open('/Users/zacksnyder/ProgramOut.txt', 'a')
+        f_output.write("global step %d learning rate %.4f step-time %.2f perplexity "
+               "%.2f\n" % (model.global_step.eval(), model.learning_rate.eval(),
                          step_time, perplexity))
+        f_output.close()
         # Decrease learning rate if no improvement was seen over last 3 times.
         if len(previous_losses) > 2 and loss > max(previous_losses[-3:]):
           sess.run(model.learning_rate_decay_op)
@@ -194,14 +205,18 @@ def train():
         # Run evals on development set and print their perplexity.
         for bucket_id in xrange(len(_buckets)):
           if len(dev_set[bucket_id]) == 0:
-            print("  eval: empty bucket %d" % (bucket_id))
+            f_output = open('/Users/zacksnyder/ProgramOut.txt', 'a')
+            f_output.write("  eval: empty bucket %d" % (bucket_id))
+            f_output.close()
             continue
           encoder_inputs, decoder_inputs, target_weights = model.get_batch(
               dev_set, bucket_id)
           _, eval_loss, _ = model.step(sess, encoder_inputs, decoder_inputs,
                                        target_weights, bucket_id, True)
           eval_ppx = math.exp(eval_loss) if eval_loss < 300 else float('inf')
-          print("  eval: bucket %d perplexity %.2f" % (bucket_id, eval_ppx))
+          f_output = open('/Users/zacksnyder/ProgramOut.txt', 'a')
+          f_output.write("  eval: bucket %d perplexity %.2f" % (bucket_id, eval_ppx))
+          f_output.close()
         sys.stdout.flush()
 
 
