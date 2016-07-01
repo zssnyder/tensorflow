@@ -41,11 +41,28 @@ import numpy as np
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
-import pyDaemon
-pyDaemon.createDaemon()
-
 from tensorflow.models.rnn.translate import data_utils
 from tensorflow.models.rnn.translate import seq2seq_model
+
+#Altered code
+DATA_DIR = "/home/ubuntu/TransFiles/data/"
+TRAIN_DIR = "/home/ubuntu/TransFiles/train/"
+
+from daemon import Daemon
+
+import logging
+import logging.handlers
+LOG_FILENAME = 'ProgramLogs/ProgramOut.log'
+
+logger = logging.getLogger('')
+logger.setLevel(logging.DEBUG)
+
+handler = logging.handlers.RotatingFileHandler(LOG_FILENAME, maxBytes=1024, backupCount=5)
+logger.addHandler(handler)
+
+def log(debug_string):
+    logger.debug(debug_string)
+#End alteration
 
 
 tf.app.flags.DEFINE_float("learning_rate", 0.5, "Learning rate.")
@@ -59,8 +76,8 @@ tf.app.flags.DEFINE_integer("size", 1024, "Size of each model layer.")
 tf.app.flags.DEFINE_integer("num_layers", 3, "Number of layers in the model.")
 tf.app.flags.DEFINE_integer("en_vocab_size", 40000, "English vocabulary size.")
 tf.app.flags.DEFINE_integer("fr_vocab_size", 40000, "French vocabulary size.")
-tf.app.flags.DEFINE_string("data_dir", "/tmp", "Data directory")
-tf.app.flags.DEFINE_string("train_dir", "/tmp", "Training directory.")
+tf.app.flags.DEFINE_string("data_dir", DATA_DIR, "Data directory")
+tf.app.flags.DEFINE_string("train_dir", TRAIN_DIR, "Training directory.")
 tf.app.flags.DEFINE_integer("max_train_data_size", 0,
                             "Limit on the size of training data (0: no limit).")
 tf.app.flags.DEFINE_integer("steps_per_checkpoint", 200,
@@ -102,7 +119,7 @@ def read_data(source_path, target_path, max_size=None):
       while source and target and (not max_size or counter < max_size):
         counter += 1
         if counter % 100000 == 0:
-          print("  reading data line %d" % counter)
+          log("  reading data line %d" % counter)
           sys.stdout.flush()
         source_ids = [int(x) for x in source.split()]
         target_ids = [int(x) for x in target.split()]
@@ -124,10 +141,10 @@ def create_model(session, forward_only):
       forward_only=forward_only)
   ckpt = tf.train.get_checkpoint_state(FLAGS.train_dir)
   if ckpt and tf.gfile.Exists(ckpt.model_checkpoint_path):
-    print("Reading model parameters from %s" % ckpt.model_checkpoint_path)
+    log("Reading model parameters from %s" % ckpt.model_checkpoint_path)
     model.saver.restore(session, ckpt.model_checkpoint_path)
   else:
-    print("Created model with fresh parameters.")
+    log("Created model with fresh parameters.")
     session.run(tf.initialize_all_variables())
   return model
 
@@ -135,24 +152,17 @@ def create_model(session, forward_only):
 def train():
   """Train a en->fr translation model using WMT data."""
   # Prepare WMT data.
-  f_output = open('/home/ubuntu/ProgramOut.txt', 'w')
-  f_output.write("Preparing WMT data in %s\n" % FLAGS.data_dir)
-  f_output.close()
+  log("Preparing WMT data in %s\n" % FLAGS.data_dir)
   en_train, fr_train, en_dev, fr_dev, _, _ = data_utils.prepare_wmt_data(
       FLAGS.data_dir, FLAGS.en_vocab_size, FLAGS.fr_vocab_size)
 
   with tf.Session() as sess:
     # Create model.
-    f_output = open('/home/ubuntu/ProgramOut.txt', 'a')
-    f_output.write("Creating %d layers of %d units.\n" % (FLAGS.num_layers, FLAGS.size))
-    f_output.close()
+    log("Creating %d layers of %d units.\n" % (FLAGS.num_layers, FLAGS.size))
     model = create_model(sess, False)
 
     # Read data into buckets and compute their sizes.
-    f_output = open('/home/ubuntu/ProgramOut.txt', 'a')
-    f_output.write("Reading development and training data (limit: %d).\n"
-           % FLAGS.max_train_data_size)
-    f_output.close()
+    log("Reading development and training data (limit: %d).\n" % FLAGS.max_train_data_size)
     dev_set = read_data(en_dev, fr_dev)
     train_set = read_data(en_train, fr_train, FLAGS.max_train_data_size)
     train_bucket_sizes = [len(train_set[b]) for b in xrange(len(_buckets))]
@@ -189,11 +199,7 @@ def train():
       if current_step % FLAGS.steps_per_checkpoint == 0:
         # Print statistics for the previous epoch.
         perplexity = math.exp(loss) if loss < 300 else float('inf')
-        f_output = open('/home/ubuntu/ProgramOut.txt', 'a')
-        f_output.write("global step %d learning rate %.4f step-time %.2f perplexity "
-               "%.2f\n" % (model.global_step.eval(), model.learning_rate.eval(),
-                         step_time, perplexity))
-        f_output.close()
+        log("global step %d learning rate %.4f step-time %.2f perplexity %.2f\n" % (model.global_step.eval(), model.learning_rate.eval(), step_time, perplexity))
         # Decrease learning rate if no improvement was seen over last 3 times.
         if len(previous_losses) > 2 and loss > max(previous_losses[-3:]):
           sess.run(model.learning_rate_decay_op)
@@ -205,18 +211,14 @@ def train():
         # Run evals on development set and print their perplexity.
         for bucket_id in xrange(len(_buckets)):
           if len(dev_set[bucket_id]) == 0:
-            f_output = open('/home/ubuntu/ProgramOut.txt', 'a')
-            f_output.write("  eval: empty bucket %d\n" % (bucket_id))
-            f_output.close()
+            log("  eval: empty bucket %d\n" % (bucket_id))
             continue
           encoder_inputs, decoder_inputs, target_weights = model.get_batch(
               dev_set, bucket_id)
           _, eval_loss, _ = model.step(sess, encoder_inputs, decoder_inputs,
                                        target_weights, bucket_id, True)
           eval_ppx = math.exp(eval_loss) if eval_loss < 300 else float('inf')
-          f_output = open('/home/ubuntu/ProgramOut.txt', 'a')
-          f_output.write("  eval: bucket %d perplexity %.2f\n" % (bucket_id, eval_ppx))
-          f_output.close()
+          log("  eval: bucket %d perplexity %.2f\n" % (bucket_id, eval_ppx))
         sys.stdout.flush()
 
 
@@ -265,7 +267,7 @@ def decode():
 def self_test():
   """Test the translation model."""
   with tf.Session() as sess:
-    print("Self-test for neural translation model.")
+    log("Self-test for neural translation model.")
     # Create model with vocabularies of 10, 2 small buckets, 2 layers of 32.
     model = seq2seq_model.Seq2SeqModel(10, 10, [(3, 3), (6, 6)], 32, 2,
                                        5.0, 32, 0.3, 0.99, num_samples=8)
@@ -290,5 +292,25 @@ def main(_):
   else:
     train()
 
+#Altered code
+class MyDaemon(Daemon):
+    def run(self):
+        tf.app.run()
+
 if __name__ == "__main__":
-  tf.app.run()
+    daemon = MyDaemon('/tmp/translate.pid')
+    if len(sys.argv) == 2:
+        if 'start' == sys.argv[1]:
+            daemon.start()
+        elif 'stop' == sys.argv[1]:
+            daemon.stop()
+        elif 'restart' == sys.argv[1]:
+            daemon.restart()
+        else:
+            print ("Unknown command")
+            sys.exit(2)
+        sys.exit(0)
+    else:
+        print ("usage: %s start|stop|restart" % sys.argv[0])
+        sys.exit(2)
+#End alteration
