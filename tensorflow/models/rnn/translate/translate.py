@@ -42,7 +42,7 @@ from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
 import pyDaemon
-#pyDaemon.createDaemon()
+pyDaemon.createDaemon()
 
 from tensorflow.models.rnn.translate import data_utils
 from tensorflow.models.rnn.translate import seq2seq_model
@@ -135,7 +135,7 @@ def create_model(session, forward_only):
 def train():
   """Train a en->fr translation model using WMT data."""
   # Prepare WMT data.
-  f_output = open('/Users/zacksnyder/ProgramOut.txt', 'w')
+  f_output = open('/home/ubuntu/ProgramOut.txt', 'w')
   f_output.write("Preparing WMT data in %s\n" % FLAGS.data_dir)
   f_output.close()
   en_train, fr_train, en_dev, fr_dev, _, _ = data_utils.prepare_wmt_data(
@@ -143,13 +143,13 @@ def train():
 
   with tf.Session() as sess:
     # Create model.
-    f_output = open('/Users/zacksnyder/ProgramOut.txt', 'a')
+    f_output = open('/home/ubuntu/ProgramOut.txt', 'a')
     f_output.write("Creating %d layers of %d units.\n" % (FLAGS.num_layers, FLAGS.size))
     f_output.close()
     model = create_model(sess, False)
 
     # Read data into buckets and compute their sizes.
-    f_output = open('/Users/zacksnyder/ProgramOut.txt', 'a')
+    f_output = open('/home/ubuntu/ProgramOut.txt', 'a')
     f_output.write("Reading development and training data (limit: %d).\n"
            % FLAGS.max_train_data_size)
     f_output.close()
@@ -189,7 +189,7 @@ def train():
       if current_step % FLAGS.steps_per_checkpoint == 0:
         # Print statistics for the previous epoch.
         perplexity = math.exp(loss) if loss < 300 else float('inf')
-        f_output = open('/Users/zacksnyder/ProgramOut.txt', 'a')
+        f_output = open('/home/ubuntu/ProgramOut.txt', 'a')
         f_output.write("global step %d learning rate %.4f step-time %.2f perplexity "
                "%.2f\n" % (model.global_step.eval(), model.learning_rate.eval(),
                          step_time, perplexity))
@@ -205,8 +205,8 @@ def train():
         # Run evals on development set and print their perplexity.
         for bucket_id in xrange(len(_buckets)):
           if len(dev_set[bucket_id]) == 0:
-            f_output = open('/Users/zacksnyder/ProgramOut.txt', 'a')
-            f_output.write("  eval: empty bucket %d" % (bucket_id))
+            f_output = open('/home/ubuntu/ProgramOut.txt', 'a')
+            f_output.write("  eval: empty bucket %d\n" % (bucket_id))
             f_output.close()
             continue
           encoder_inputs, decoder_inputs, target_weights = model.get_batch(
@@ -214,8 +214,8 @@ def train():
           _, eval_loss, _ = model.step(sess, encoder_inputs, decoder_inputs,
                                        target_weights, bucket_id, True)
           eval_ppx = math.exp(eval_loss) if eval_loss < 300 else float('inf')
-          f_output = open('/Users/zacksnyder/ProgramOut.txt', 'a')
-          f_output.write("  eval: bucket %d perplexity %.2f" % (bucket_id, eval_ppx))
+          f_output = open('/home/ubuntu/ProgramOut.txt', 'a')
+          f_output.write("  eval: bucket %d perplexity %.2f\n" % (bucket_id, eval_ppx))
           f_output.close()
         sys.stdout.flush()
 
