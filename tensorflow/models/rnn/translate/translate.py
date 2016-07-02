@@ -45,10 +45,10 @@ from tensorflow.models.rnn.translate import data_utils
 from tensorflow.models.rnn.translate import seq2seq_model
 
 #Altered code
-DATA_DIR = "/home/ubuntu/TransFiles/data/"
-TRAIN_DIR = "/home/ubuntu/TransFiles/train/"
+DATA_DIR = "/Users/zacksnyder/Documents/TranslationFiles/"
+TRAIN_DIR = "/Users/zacksnyder/Documents/TranslationFiles/"
 
-from daemon import Daemon
+import daemon
 
 import logging
 import logging.handlers
@@ -62,6 +62,15 @@ logger.addHandler(handler)
 
 def log(debug_string):
     logger.debug(debug_string)
+
+#Preserves the translation data from being closed by daemon process
+
+data_files = [f for f in os.listdir(DATA_DIR) if os.path.isfile(os.path.join(DATA_DIR, f))]
+train_files = [f for f in os.listdir(TRAIN_DIR) if os.path.isfile(os.path.join(TRAIN_DIR, f))]
+useful_files = [handler.stream]
+useful_files.extend(data_files)
+useful_files.extend(train_files)
+context = daemon.DaemonContext(files_preserve=useful_files, prevent_core=True)
 #End alteration
 
 
@@ -151,11 +160,15 @@ def create_model(session, forward_only):
 
 def train():
   """Train a en->fr translation model using WMT data."""
+
+  #Create daemon process here
+  context.open()
+
   # Prepare WMT data.
   log("Preparing WMT data in %s\n" % FLAGS.data_dir)
   en_train, fr_train, en_dev, fr_dev, _, _ = data_utils.prepare_wmt_data(
       FLAGS.data_dir, FLAGS.en_vocab_size, FLAGS.fr_vocab_size)
-
+  
   with tf.Session() as sess:
     # Create model.
     log("Creating %d layers of %d units.\n" % (FLAGS.num_layers, FLAGS.size))
@@ -293,11 +306,14 @@ def main(_):
     train()
 
 #Altered code
+"""
 class MyDaemon(Daemon):
     def run(self):
         tf.app.run()
+"""
 
 if __name__ == "__main__":
+    """
     daemon = MyDaemon('/tmp/translate.pid')
     if len(sys.argv) == 2:
         if 'start' == sys.argv[1]:
@@ -313,4 +329,6 @@ if __name__ == "__main__":
     else:
         print ("usage: %s start|stop|restart" % sys.argv[0])
         sys.exit(2)
+    """
+    tf.app.run()
 #End alteration
